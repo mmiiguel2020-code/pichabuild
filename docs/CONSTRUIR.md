@@ -116,3 +116,44 @@ muestra por muestra). El loop se copia con sus mismos frames.
 tiene que apuntar a **N** (el numero de zonas), no a N+1. Si apunta a N+1,
 el lector recorre `ibag[bi+1]` y se sale del array:
 `IndexError: list index out of range`.
+
+------------------------------------------------------------------------------
+## PESTANA 3: ESCUCHAR (teclado QWERTY)
+
+Un FluidSynth **vivo**, al que se le mandan notas por la entrada estandar.
+No se arranca un proceso por nota: eso tardaba 2 segundos por tecla.
+
+```
+fluidsynth -a pipewire -m alsa_seq -g 1.5 BANCO.sf2      (sin archivo MIDI)
+     ^ asi queda escuchando comandos por stdin
+```
+
+Los comandos (comprobados con `help event`):
+
+```
+prog 0 4            cambiar al programa 4
+noteon 0 60 100     encender la nota 60
+noteoff 0 60        apagarla
+```
+
+### El mapa del teclado
+
+```
+A W S E D F T G Y H U J K   Do Do# Re Re# Mi Fa Fa# Sol Sol# La La# Si Do
+Z X C V B N M , . /         la misma, una octava menos
+```
+
+La octava se elige con el control "octava base".
+
+### Un fallo que costo un rato
+
+Un archivo MIDI con **dos deltas seguidos** antes del fin de pista hace que
+FluidSynth responda `Unexpected end of file` y **no renderice nada**:
+
+```
+... 80 43 00 | 28 | 00 ff 2f 00
+                 ^    ^
+              delta   evento 0x00 invalido
+```
+
+Va **un solo delta**. Con eso: 3,36 s de audio en vez de 0.

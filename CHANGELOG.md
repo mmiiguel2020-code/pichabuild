@@ -16,7 +16,12 @@ SECCION 2   carpeta de WAV aprobados  ->  SF2 de 5 registros
 
 ### Lo que entró
 
-- **Ventana de dos secciones** (`app2.py`, PySide6). Lanzador en el Escritorio.
+- **Ventana de tres secciones** (`app2.py`, PySide6): afinar/nombrar, armar y
+  **escuchar**. Lanzador en el Escritorio.
+- **Escuchar**: carga un SF2, lista sus presets, toca una nota o una escala,
+  y **teclado QWERTY en vivo** (A W S E D F T G Y H U J K = Do Re Mi Fa Sol
+  La Si; Z X C V B N M , . / = una octava menos). Usa un FluidSynth vivo y le
+  manda `noteon`/`noteoff` por la entrada estándar, asi suena al instante.
 - **Afinar**: del repo `afinador` (librosa pyin, residual medio 0,34 cent).
 - **Nombrar**: `nota.py` decide la nota buscando en todo el rango con picos
   reales; si duda, pregunta y **recuerda** la respuesta.
