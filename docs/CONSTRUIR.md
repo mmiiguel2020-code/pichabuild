@@ -157,3 +157,24 @@ FluidSynth responda `Unexpected end of file` y **no renderice nada**:
 ```
 
 Va **un solo delta**. Con eso: 3,36 s de audio en vez de 0.
+
+------------------------------------------------------------------------------
+## SALIDA DE AUDIO — NO TOCAR LA PREDETERMINADA
+
+En este equipo el audio sale por **el monitor PHILIPS (HDMI)**:
+
+```
+wpctl status
+  Sinks:
+  *  81. Audio Interno Estéreo digital (HDMI)   <-- la que suena
+     62. UMC202HD 192k Line A                   <-- el Behringer, sin nada
+```
+
+**No cambiar el sink predeterminado a la 62**: ahi no hay altavoces conectados
+y el usuario se queda sin audio (paso el 26 oct 2026 y hubo que deshacerlo).
+
+Si alguna vez hay que cambiarlo:
+
+```bash
+wpctl set-default 81     # volver al HDMI (el que suena)
+```
