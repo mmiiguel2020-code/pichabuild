@@ -52,6 +52,8 @@ def procesar_carpeta(entrada, salida, log=print, preguntar_dudas=True):
     respuestas = _cargar_respuestas()
     archivos = sorted(f for f in os.listdir(entrada) if f.lower().endswith(".wav"))
     informe = []
+    # cuantas veces ha salido cada nota: para no pisar archivos en un lote
+    tomas = {}
 
     for f in archivos:
         ruta = os.path.join(entrada, f)
@@ -84,34 +86,38 @@ def procesar_carpeta(entrada, salida, log=print, preguntar_dudas=True):
             # --- 2. afinar si hace falta ---
             afinada = abs(cents) >= UMBRAL_CENTS
             if afinada:
-                with wave.open(ruta, "rb") as w:
-                    sr, ch = w.getframerate(), w.getnchannels()
-                    raw = w.readframes(w.getnframes())
-                x = np.frombuffer(raw, dtype="<i2").astype(np.float64) / 32768.0
-                if ch > 1:
-                    x = x.reshape(-1, ch).mean(axis=1)
+                from .core import leer_pcm
+                x, sr = leer_pcm(ruta)
                 rr = 2 ** (-cents / 1200.0)
                 y = _resample(x, sr, rr)
-                destino = tempfile.mktemp(suffix=".wav", dir=salida)
+                # el temporal va a /tmp: NUNCA a la carpeta de salida
+                destino = tempfile.mktemp(suffix=".wav")
                 _escribir_wav(destino, y, sr)
                 filas.update(afinada=True, factor=round(float(rr), 6))
             else:
                 destino = ruta
                 filas["afinada"] = False
 
-            # --- 3. nombre nuevo ---
-            nuevo = nombre_limpio(midi)
+            # --- 3. nombre nuevo, numerando si la nota se repite ---
+            tomas[midi] = tomas.get(midi, 0) + 1
+            toma = tomas[midi]
+            nuevo = nombre_limpio(midi, toma if toma > 1 else None)
             filas["nombre_nuevo"] = nuevo
+            filas["toma"] = toma
 
             # --- 4. destino ---
             tiene, detalle = tiene_loop(destino)
             filas["loop"] = detalle
-            if afinada or not tiene:
-                filas["destino"] = "REBUCLEO"
-                shutil.copy2(destino, os.path.join(REBUCLEO, nuevo))
-            else:
-                filas["destino"] = "salida"
-                shutil.copy2(destino, os.path.join(salida, nuevo))
+            carpeta = REBUCLEO if (afinada or not tiene) else salida
+            filas["destino"] = "REBUCLEO" if (afinada or not tiene) else "salida"
+            final = os.path.join(carpeta, nuevo)
+            n = 1
+            while os.path.exists(final):      # nunca sobreescribir
+                n += 1
+                raiz, ext = os.path.splitext(nuevo)
+                final = os.path.join(carpeta, f"{raiz}_{n}{ext}")
+            filas["nombre_nuevo"] = os.path.basename(final)
+            shutil.copy2(destino, final)
             if destino != ruta:
                 os.unlink(destino)
 

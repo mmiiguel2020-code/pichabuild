@@ -39,6 +39,35 @@ def nombre_limpio(midi, toma=None, ext=".wav"):
 
 
 # ------------------------------------------------------------------ wav ----
+def leer_pcm(ruta):
+    """Lee un WAV sea de 8, 16, 24 o 32 bits. Devuelve (mono float64, sr).
+
+    Antes se forzaba int16 y los WAV de 24 bits reventaban con
+    "buffer size must be a multiple of element size".
+    """
+    with wave.open(ruta, "rb") as w:
+        sr, ch, ancho, n = (w.getframerate(), w.getnchannels(),
+                            w.getsampwidth(), w.getnframes())
+        raw = w.readframes(n)
+    if ancho == 1:
+        x = (np.frombuffer(raw, dtype=np.uint8).astype(np.float64) - 128.0) / 128.0
+    elif ancho == 2:
+        x = np.frombuffer(raw, dtype="<i2").astype(np.float64) / 32768.0
+    elif ancho == 3:
+        b = np.frombuffer(raw, dtype=np.uint8)
+        b = b[:len(b) - (len(b) % 3)].reshape(-1, 3).astype(np.int32)
+        v = b[:, 0] | (b[:, 1] << 8) | (b[:, 2] << 16)
+        v = np.where(v >= (1 << 23), v - (1 << 24), v)
+        x = v.astype(np.float64) / 8388608.0
+    elif ancho == 4:
+        x = np.frombuffer(raw, dtype="<i4").astype(np.float64) / 2147483648.0
+    else:
+        raise ValueError(f"ancho de muestra no soportado: {ancho} bytes")
+    if ch > 1:
+        x = x.reshape(-1, ch).mean(axis=1)
+    return x, sr
+
+
 def chunks_wav(ruta):
     """Lista de (id, offset_datos, tam). Sin interpretar nada."""
     d = open(ruta, "rb").read()
@@ -82,23 +111,7 @@ def medir_cents(ruta, midi_esperado, a4=440.0):
     Asi no salta de octava (Directriz 6). Usa autocorrelacion sobre 0.3 s
     del centro, que es estable.
     """
-    with wave.open(ruta, "rb") as w:
-        sr = w.getframerate()
-        n = w.getnframes()
-        raw = w.readframes(n)
-        canales = w.getnchannels()
-        ancho = w.getsampwidth()
-    if ancho == 2:
-        x = np.frombuffer(raw, dtype="<i2").astype(np.float64) / 32768.0
-    elif ancho == 3:
-        b = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3).astype(np.int32)
-        v = (b[:, 0] | (b[:, 1] << 8) | (b[:, 2] << 16))
-        v = np.where(v >= 1 << 23, v - (1 << 24), v)
-        x = v.astype(np.float64) / 8388608.0
-    else:
-        raise ValueError(f"ancho de muestra no soportado: {ancho}")
-    if canales > 1:
-        x = x.reshape(-1, canales).mean(axis=1)
+    x, sr = leer_pcm(ruta)
 
     c = len(x) // 2
     w_ = min(int(0.15 * sr), c)

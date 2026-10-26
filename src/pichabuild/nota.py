@@ -31,22 +31,8 @@ REL_PICO = 0.02
 
 
 def _leer(ruta):
-    with wave.open(ruta, "rb") as w:
-        sr, ch, ancho = w.getframerate(), w.getnchannels(), w.getsampwidth()
-        n = w.getnframes()
-        raw = w.readframes(n)
-    if ancho == 2:
-        x = np.frombuffer(raw, dtype="<i2").astype(np.float64) / 32768.0
-    elif ancho == 3:
-        b = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3).astype(np.int32)
-        v = b[:, 0] | (b[:, 1] << 8) | (b[:, 2] << 16)
-        v = np.where(v >= 1 << 23, v - (1 << 24), v)
-        x = v.astype(np.float64) / 8388608.0
-    else:
-        raise ValueError(f"ancho no soportado: {ancho}")
-    if ch > 1:
-        x = x.reshape(-1, ch).mean(axis=1)
-    return x, sr
+    from .core import leer_pcm
+    return leer_pcm(ruta)
 
 
 def _espectro(x, sr):

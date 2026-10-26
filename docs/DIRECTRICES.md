@@ -161,3 +161,40 @@ Miguel: "lo buscas en todo el rango con la banda ancha, si dudas, me preguntas."
 
 Esa es la unica excepcion a la Directriz 6: el afinador decide siempre...
 salvo cuando no esta seguro, y entonces pregunta.
+
+------------------------------------------------------------------------------
+## DIRECTRIZ 9 — LA TABLA DE REGISTROS ES LA DE MIGUEL
+
+Corregida el 26 oct 2026. **Manda sobre cualquier tabla anterior del repo.**
+
+```
+Clarinete  M                  0
+Fagot (L)  L                  0
+Bandoneon  L + M+             L 0  ·  M+ 0 … +20
+Violin     M + M+             M 0  ·  M+ 0 … +20
+Master     L + M + M+         L 0 … -20 · M 0 · M+ 0 … +20
+```
+
+Detalle en `docs/CENTS_POR_REGISTRO.md`.
+
+------------------------------------------------------------------------------
+## DIRECTRIZ 10 — LOS CENTS SON INDEPENDIENTES POR REGISTRO
+
+Miguel: "cada valor independiente, aplicado una sola vez".
+
+```
+Bandoneon   M+   su propio valor    ~+15 por defecto
+Violin      M+   su propio valor    ~+15 por defecto
+Master      L    su propio valor    ~0  por defecto  (-20 … 0)
+Master      M+   su propio valor    ~+15 por defecto
+```
+
+El motor toma la afinacion de `cfg["voces"][vn]`, UNA por voz. Para que
+sean independientes se multiplica la voz en la config que se le pasa:
+
+```
+M2_band   M2_violin   M2_master      (cada una con su afinacion_cents)
+L_master                             (la L del Master)
+```
+
+Sin tocar el motor. El valor se aplica **una sola vez** (no se acumula).
