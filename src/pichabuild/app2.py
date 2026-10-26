@@ -22,6 +22,7 @@ import wave
 from PySide6.QtCore import Qt, Signal, QObject
 
 from .base_sf2 import armar_desde_wavs, leer_loop, nota_de_nombre
+from . import oir as oirmod
 from .revisar import revisar, revisar_carpeta
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox,
                                QFileDialog, QGroupBox, QHBoxLayout, QLabel,
@@ -69,6 +70,7 @@ class Ventana(QMainWindow):
         tabs = QTabWidget()
         tabs.addTab(self._tab_afinar(), "1 · Afinación y nombrado")
         tabs.addTab(self._tab_armar(), "2 · Armado (5 registros)")
+        tabs.addTab(self._tab_oir(), "3 · Escuchar")
         self.setCentralWidget(tabs)
 
     # ---- seccion 1 -------------------------------------------------------
@@ -179,6 +181,94 @@ class Ventana(QMainWindow):
         self.log2 = QLabel(""); self.log2.setWordWrap(True)
         v.addWidget(self.log2, 1)
         return w
+
+    # ---- seccion 3: escuchar -------------------------------------------
+    def _tab_oir(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+
+        g = QGroupBox("Banco de sonidos")
+        f = QVBoxLayout(g)
+        self.e_sf2_oir = self._fila("SF2", os.path.expanduser("~/Escritorio/chido sf2.sf2"), f)
+        hb = QHBoxLayout()
+        self.btn_cargar = QPushButton("Cargar presets")
+        self.btn_cargar.clicked.connect(self.cargar_presets)
+        hb.addWidget(self.btn_cargar)
+        hb.addWidget(QLabel("preset:"))
+        self.combo_preset = QComboBox()
+        self.combo_preset.setMinimumWidth(240)
+        hb.addWidget(self.combo_preset, 1)
+        f.addLayout(hb)
+        v.addWidget(g)
+
+        g2 = QGroupBox("Tocar")
+        f2 = QVBoxLayout(g2)
+        h2 = QHBoxLayout()
+        h2.addWidget(QLabel("nota"))
+        self.e_nota = QLineEdit("A4")
+        self.e_nota.setMaximumWidth(90)
+        h2.addWidget(self.e_nota)
+        self.btn_nota = QPushButton("♪  Tocar esa nota")
+        self.btn_nota.clicked.connect(lambda: self.tocar("nota"))
+        h2.addWidget(self.btn_nota)
+        self.btn_escala = QPushButton("♪♪  Escala (Do4–Do5)")
+        self.btn_escala.clicked.connect(lambda: self.tocar("escala"))
+        h2.addWidget(self.btn_escala)
+        h2.addStretch(1)
+        f2.addLayout(h2)
+
+        h3 = QHBoxLayout()
+        h3.addWidget(QLabel("octava rápida:"))
+        for m in ("C3", "C4", "C5", "C6"):
+            b = QPushButton(m)
+            b.setFixedWidth(52)
+            b.clicked.connect(lambda _=False, x=m: self.tocar_nota_directa(x))
+            h3.addWidget(b)
+        h3.addStretch(1)
+        f2.addLayout(h3)
+        v.addWidget(g2)
+
+        self.lbl_oir = QLabel("")
+        self.lbl_oir.setWordWrap(True)
+        v.addWidget(self.lbl_oir, 1)
+        return w
+
+    def cargar_presets(self):
+        ruta = self.e_sf2_oir.text()
+        if not os.path.isfile(ruta):
+            self.lbl_oir.setText("no existe ese SF2")
+            return
+        try:
+            lista = oirmod.presets(ruta)
+        except Exception as e:
+            self.lbl_oir.setText(f"no pude leer los presets: {e}")
+            return
+        self.combo_preset.clear()
+        for nom, banco, prog in lista:
+            self.combo_preset.addItem(f"{prog} · {nom}  (banco {banco})", prog)
+        self.lbl_oir.setText(f"{len(lista)} presets cargados de "
+                             f"{os.path.basename(ruta)}")
+
+    def tocar(self, que):
+        nota = self.e_nota.text().strip() or "A4"
+        self.tocar_nota_directa("escala" if que == "escala" else nota)
+
+    def tocar_nota_directa(self, nota):
+        ruta = self.e_sf2_oir.text()
+        if not os.path.isfile(ruta):
+            self.lbl_oir.setText("no existe ese SF2")
+            return
+        prog = self.combo_preset.currentData()
+        if prog is None:
+            self.cargar_presets()
+            prog = self.combo_preset.currentData() or 0
+        self.lbl_oir.setText(f"sonando: {os.path.basename(ruta)} · "
+                             f"programa {prog} · {nota}")
+        QApplication.processEvents()
+        ok, err = oirmod.tocar(ruta, int(prog), nota)
+        self.lbl_oir.setText(
+            f"{'♪' if ok else 'ERROR'} {os.path.basename(ruta)} · "
+            f"programa {prog} · {nota}" + ("" if ok else f"\n{err}"))
 
     def _fila(self, etiqueta, valor, layout):
         h = QHBoxLayout()
