@@ -19,7 +19,7 @@ import tempfile
 import threading
 import wave
 
-from PySide6.QtCore import Qt, Signal, QObject
+from PySide6.QtCore import Qt, Signal, QObject, QProcess
 
 from .base_sf2 import armar_desde_wavs, leer_loop, nota_de_nombre
 from . import oir as oirmod
@@ -49,9 +49,33 @@ REGISTROS = [
 ]
 
 
+# Teclado QWERTY -> semitonos sobre la nota base (como FL Studio / Ableton)
+TECLAS = {
+    Qt.Key_A: 0,  Qt.Key_W: 1,  Qt.Key_S: 2,  Qt.Key_E: 3,
+    Qt.Key_D: 4,  Qt.Key_F: 5,  Qt.Key_T: 6,  Qt.Key_G: 7,
+    Qt.Key_Y: 8,  Qt.Key_H: 9,  Qt.Key_U: 10, Qt.Key_J: 11,
+    Qt.Key_K: 12,
+}
+# fila de abajo, una octava menos
+TECLAS_BAJAS = {
+    Qt.Key_Z: 0,  Qt.Key_2: 1,  Qt.Key_X: 2,  Qt.Key_3: 3,
+    Qt.Key_C: 4,  Qt.Key_V: 5,  Qt.Key_B: 6,  Qt.Key_N: 7,
+    Qt.Key_M: 8,  Qt.Key_Comma: 9, Qt.Key_Period: 10, Qt.Key_Slash: 11,
+}
+TODAS = {**TECLAS, **TECLAS_BAJAS}
+
+
 class Puente(QObject):
     linea = Signal(str)
     fin = Signal(bool, str)
+
+
+def QSpinBoxWithRange(lo, hi, val):
+    from PySide6.QtWidgets import QSpinBox
+    sp = QSpinBox()
+    sp.setRange(lo, hi)
+    sp.setValue(val)
+    return sp
 
 
 class Ventana(QMainWindow):
@@ -197,6 +221,8 @@ class Ventana(QMainWindow):
         hb.addWidget(QLabel("preset:"))
         self.combo_preset = QComboBox()
         self.combo_preset.setMinimumWidth(240)
+        self.combo_preset.currentIndexChanged.connect(
+            lambda _: self._mandar_programa() if getattr(self, "proc", None) else None)
         hb.addWidget(self.combo_preset, 1)
         f.addLayout(hb)
         v.addWidget(g)
@@ -228,10 +254,117 @@ class Ventana(QMainWindow):
         f2.addLayout(h3)
         v.addWidget(g2)
 
+        g3 = QGroupBox("Teclado QWERTY")
+        f3 = QVBoxLayout(g3)
+        h3 = QHBoxLayout()
+        self.btn_teclado = QPushButton("▶  Activar teclado")
+        self.btn_teclado.setCheckable(True)
+        self.btn_teclado.clicked.connect(self.alternar_teclado)
+        h3.addWidget(self.btn_teclado)
+        h3.addWidget(QLabel("octava base:"))
+        self.sp_octava = QSpinBoxWithRange(1, 7, 4)
+        h3.addWidget(self.sp_octava)
+        h3.addStretch(1)
+        f3.addLayout(h3)
+        f3.addWidget(QLabel(
+            "A W S E D F T G Y H U J K  =  Do Re Mi Fa Sol La Si (fila del medio)\n"
+            "Z X C V B N M , . /        =  una octava menos\n"
+            "Cambia la octava con el control de arriba."))
+        v.addWidget(g3)
+
         self.lbl_oir = QLabel("")
         self.lbl_oir.setWordWrap(True)
         v.addWidget(self.lbl_oir, 1)
+        self.setFocusPolicy(Qt.StrongFocus)
         return w
+
+    # ---- teclado QWERTY en vivo ---------------------------------------
+    def alternar_teclado(self, activo):
+        if activo:
+            ruta = self.e_sf2_oir.text()
+            if not os.path.isfile(ruta):
+                self.lbl_oir.setText("no existe ese SF2")
+                self.btn_teclado.setChecked(False)
+                return
+            if self.combo_preset.count() == 0:
+                self.cargar_presets()
+            self._arrancar_synth(ruta)
+            if self.proc is None or self.proc.state() != QProcess.Running:
+                self.lbl_oir.setText("no pude arrancar FluidSynth")
+                self.btn_teclado.setChecked(False)
+                return
+            self._mandar_programa()
+            self.btn_teclado.setText("■  Teclado activo  (pulsa para parar)")
+            self.setFocus()
+            self.lbl_oir.setText("teclado activo: pulsa A S D F…")
+        else:
+            self._parar_synth()
+            self.btn_teclado.setText("▶  Activar teclado")
+            self.lbl_oir.setText("teclado parado")
+
+    def _arrancar_synth(self, ruta):
+        self._parar_synth()
+        pr = QProcess(self)
+        pr.setProgram("fluidsynth")
+        pr.setArguments(["-a", "pipewire", "-m", "alsa_seq",
+                         "-g", "1.5", ruta])
+        pr.start()
+        if not pr.waitForStarted(4000):
+            self.proc = None
+            return
+        self.proc = pr
+
+    def _parar_synth(self):
+        pr = getattr(self, "proc", None)
+        if pr is None:
+            return
+        try:
+            pr.write(b"quit\n")
+            pr.waitForFinished(800)
+        except Exception:
+            pass
+        try:
+            pr.kill()
+        except Exception:
+            pass
+        self.proc = None
+
+    def _mandar(self, texto):
+        pr = getattr(self, "proc", None)
+        if pr is not None and pr.state() == QProcess.Running:
+            pr.write((texto + "\n").encode())
+
+    def _mandar_programa(self):
+        prog = self.combo_preset.currentData() or 0
+        self._mandar(f"prog 0 {int(prog)}")
+
+    def keyPressEvent(self, ev):
+        if (self.btn_teclado.isChecked() and not ev.isAutoRepeat()
+                and ev.key() in TODAS):
+            base = 12 * (self.sp_octava.value() + 1)
+            semi = TODAS[ev.key()]
+            if ev.key() in TECLAS_BAJAS:
+                semi -= 12
+            nota = base + semi
+            if 0 <= nota <= 127:
+                self._mandar(f"noteon 0 {nota} 100")
+                ev.accept()
+                return
+        super().keyPressEvent(ev)
+
+    def keyReleaseEvent(self, ev):
+        if (self.btn_teclado.isChecked() and not ev.isAutoRepeat()
+                and ev.key() in TODAS):
+            base = 12 * (self.sp_octava.value() + 1)
+            semi = TODAS[ev.key()]
+            if ev.key() in TECLAS_BAJAS:
+                semi -= 12
+            nota = base + semi
+            if 0 <= nota <= 127:
+                self._mandar(f"noteoff 0 {nota}")
+                ev.accept()
+                return
+        super().keyReleaseEvent(ev)
 
     def cargar_presets(self):
         ruta = self.e_sf2_oir.text()
@@ -413,6 +546,10 @@ class Ventana(QMainWindow):
         for x in (self.btn_afinar, self.btn_armar):
             x.setEnabled(not b)
 
+    def closeEvent(self, ev):
+        self._parar_synth()
+        super().closeEvent(ev)
+
     def _fin(self, ok, msg):
         self._bloquear(False)
         self._log_afinar.setText(("" if ok else "ERROR: ") + msg)
@@ -421,6 +558,7 @@ class Ventana(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    app.aboutToQuit.connect(lambda: None)
     w = Ventana()
     w.show()
     return app.exec()
