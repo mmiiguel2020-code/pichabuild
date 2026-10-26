@@ -21,7 +21,8 @@ import wave
 
 from PySide6.QtCore import Qt, Signal, QObject
 
-from .revisar import revisar
+from .base_sf2 import armar_desde_wavs, leer_loop, nota_de_nombre
+from .revisar import revisar, revisar_carpeta
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox,
                                QFileDialog, QGroupBox, QHBoxLayout, QLabel,
                                QMainWindow, QPushButton, QSlider, QSpinBox,
@@ -116,10 +117,11 @@ class Ventana(QMainWindow):
 
         g = QGroupBox("Entrada y salida")
         f = QVBoxLayout(g)
-        self.e_ent_sf2 = self._fila("SF2 con instrumento", "", f)
+        self.e_ent_sf2 = self._fila("Carpeta de WAV aprobados",
+                                    os.path.expanduser("~/Escritorio/APROBADAS"), f)
         self.e_sal_sf2 = self._fila("Carpeta de salida", SALIDA_SF2, f)
         h = QHBoxLayout()
-        self.btn_revisar = QPushButton("Revisar el SF2 antes de armar")
+        self.btn_revisar = QPushButton("Revisar las muestras antes de armar")
         self.btn_revisar.clicked.connect(self.revisar_entrada)
         h.addWidget(self.btn_revisar)
         h.addStretch(1)
@@ -219,10 +221,10 @@ class Ventana(QMainWindow):
     def arrancar_armar(self):
         ent = self.e_ent_sf2.text()
         sal = self.e_sal_sf2.text()
-        if not os.path.isfile(ent):
-            self.log2.setText("no existe el SF2 de entrada")
+        if not os.path.isdir(ent):
+            self.log2.setText("no existe la carpeta de muestras")
             return
-        ok, avisos, datos = revisar(ent)
+        ok, avisos, datos = revisar_carpeta(ent)
         self.revisar_entrada()
         if not ok:
             self.log2.setText("no se puede armar: mira los ERRORES de arriba")
@@ -239,7 +241,14 @@ class Ventana(QMainWindow):
                 cfg = self._config(cents, atk, rel)
                 ruta_cfg = os.path.join(sal, "registros.json")
                 json.dump(cfg, open(ruta_cfg, "w"), indent=2, ensure_ascii=False)
-                cmd = [PY, MOTOR, "construir", "--sf2", ent, "--config", ruta_cfg,
+                # 1. de la carpeta de WAV a un SF2 con instrumento
+                base_sf2 = os.path.join(sal, "base.sf2")
+                okb, info = armar_desde_wavs(ent, base_sf2, log=lambda s: None)
+                if not okb:
+                    self.puente.fin.emit(False, f"no pude armar el SF2 base: {info}")
+                    return
+                # 2. el SF2 base -> los 5 registros
+                cmd = [PY, MOTOR, "construir", "--sf2", base_sf2, "--config", ruta_cfg,
                        "--salida", os.path.join(sal, "5registros.sf2"),
                        "--wavs", os.path.join(sal, "wavs")]
                 r = subprocess.run(cmd, capture_output=True, text=True)
@@ -256,16 +265,17 @@ class Ventana(QMainWindow):
         threading.Thread(target=trabajo, daemon=True).start()
 
     def revisar_entrada(self):
-        """Dice lo que le falta al SF2 ANTES de gastar diez minutos."""
+        """Dice que le falta a la carpeta de muestras ANTES de armar."""
         ent = self.e_ent_sf2.text()
-        if not os.path.isfile(ent):
-            self.lbl_diag.setText("<b>no existe el archivo</b>")
+        if not os.path.isdir(ent):
+            self.lbl_diag.setText("<b>no existe la carpeta</b>")
             return False
-        ok, avisos, datos = revisar(ent)
+        ok, avisos, datos = revisar_carpeta(ent)
         lineas = [
-            f"<b>{os.path.basename(ent)}</b> — "
-            f"{datos['muestras']} muestras · {datos['instrumentos']} instrumento(s) · "
-            f"{datos['zonas']} zonas · {datos['con_keyrange']} con keyRange"
+            f"<b>{os.path.basename(ent.rstrip(os.sep))}</b> — "
+            f"{datos['wavs']} WAV · {datos['con_nota']} con nota en el nombre · "
+            f"{datos['con_loop']} con loop · teclas "
+            f"{datos.get('rango', '—')}"
         ]
         for tipo, txt in avisos:
             color = "#b00000" if tipo == "ERROR" else "#a05000"

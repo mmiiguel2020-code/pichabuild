@@ -106,3 +106,51 @@ def revisar(ruta):
 
     ok = not any(n == "ERROR" for n, _ in avisos)
     return ok, avisos, datos
+
+
+def revisar_carpeta(carpeta):
+    """Revisa una carpeta de WAV aprobados antes de armar el SF2.
+
+    Necesita, por archivo: nota en el nombre (C4.wav) y chunk 'smpl' (loop).
+    """
+    import os
+    from .base_sf2 import leer_loop, nota_de_nombre
+    avisos = []
+    wavs = sorted(f for f in os.listdir(carpeta) if f.lower().endswith(".wav"))
+    datos = {"wavs": len(wavs), "con_nota": 0, "con_loop": 0}
+    if not wavs:
+        avisos.append(("ERROR", "la carpeta no tiene WAV"))
+        return False, avisos, datos
+
+    sin_nota, sin_loop, notas = [], [], []
+    for f in wavs:
+        m = nota_de_nombre(f)
+        if m is None:
+            sin_nota.append(f)
+        else:
+            notas.append(m)
+        if leer_loop(os.path.join(carpeta, f)) is None:
+            sin_loop.append(f)
+    datos["con_nota"] = len(wavs) - len(sin_nota)
+    datos["con_loop"] = len(wavs) - len(sin_loop)
+    if notas:
+        from .core import nombre_nota
+        datos["rango"] = f"{nombre_nota(min(notas))}-{nombre_nota(max(notas))}"
+        datos["notas"] = len(set(notas))
+
+    if sin_nota:
+        t = "ERROR" if len(sin_nota) > len(wavs) // 2 else "AVISO"
+        avisos.append((t, f"{len(sin_nota)} archivo(s) sin nota en el nombre "
+                          f"(se espera C4.wav, G#3_2.wav): "
+                          f"{', '.join(sin_nota[:3])}..."))
+    if sin_loop:
+        t = "ERROR" if len(sin_loop) > len(wavs) // 2 else "AVISO"
+        avisos.append((t, f"{len(sin_loop)} archivo(s) sin loop (chunk 'smpl'): "
+                          f"sin loop no hay rebucleo y la muestra se corta. "
+                          f"{', '.join(sin_loop[:3])}..."))
+    if datos.get("notas", 0) and len(set(notas)) < len(wavs):
+        avisos.append(("AVISO", f"{len(set(notas))} notas distintas para "
+                                f"{len(wavs)} archivos: hay repetidas"))
+
+    ok = not any(n == "ERROR" for n, _ in avisos)
+    return ok, avisos, datos
