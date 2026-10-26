@@ -20,6 +20,8 @@ import threading
 import wave
 
 from PySide6.QtCore import Qt, Signal, QObject
+
+from .revisar import revisar
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox,
                                QFileDialog, QGroupBox, QHBoxLayout, QLabel,
                                QMainWindow, QPushButton, QSlider, QSpinBox,
@@ -116,7 +118,18 @@ class Ventana(QMainWindow):
         f = QVBoxLayout(g)
         self.e_ent_sf2 = self._fila("SF2 con instrumento", "", f)
         self.e_sal_sf2 = self._fila("Carpeta de salida", SALIDA_SF2, f)
+        h = QHBoxLayout()
+        self.btn_revisar = QPushButton("Revisar el SF2 antes de armar")
+        self.btn_revisar.clicked.connect(self.revisar_entrada)
+        h.addWidget(self.btn_revisar)
+        h.addStretch(1)
+        f.addLayout(h)
         v.addWidget(g)
+
+        self.lbl_diag = QLabel("")
+        self.lbl_diag.setWordWrap(True)
+        self.lbl_diag.setTextFormat(Qt.RichText)
+        v.addWidget(self.lbl_diag)
 
         # --- cents por registro (independientes) ---
         g2 = QGroupBox("Cents por registro  (cada uno independiente)")
@@ -209,6 +222,11 @@ class Ventana(QMainWindow):
         if not os.path.isfile(ent):
             self.log2.setText("no existe el SF2 de entrada")
             return
+        ok, avisos, datos = revisar(ent)
+        self.revisar_entrada()
+        if not ok:
+            self.log2.setText("no se puede armar: mira los ERRORES de arriba")
+            return
         self._bloquear(True)
         self.log2.setText("armando…")
 
@@ -236,6 +254,27 @@ class Ventana(QMainWindow):
             except Exception as e:
                 self.puente.fin.emit(False, str(e))
         threading.Thread(target=trabajo, daemon=True).start()
+
+    def revisar_entrada(self):
+        """Dice lo que le falta al SF2 ANTES de gastar diez minutos."""
+        ent = self.e_ent_sf2.text()
+        if not os.path.isfile(ent):
+            self.lbl_diag.setText("<b>no existe el archivo</b>")
+            return False
+        ok, avisos, datos = revisar(ent)
+        lineas = [
+            f"<b>{os.path.basename(ent)}</b> — "
+            f"{datos['muestras']} muestras · {datos['instrumentos']} instrumento(s) · "
+            f"{datos['zonas']} zonas · {datos['con_keyrange']} con keyRange"
+        ]
+        for tipo, txt in avisos:
+            color = "#b00000" if tipo == "ERROR" else "#a05000"
+            lineas.append(f'<span style="color:{color}"><b>{tipo}:</b> {txt}</span>')
+        if not avisos:
+            lineas.append('<span style="color:#006000"><b>OK:</b> '
+                          'listo para armar</span>')
+        self.lbl_diag.setText("<br>".join(lineas))
+        return ok
 
     def _config(self, cents, atk, rel):
         """Config para el motor: M+ y L multiplicadas para que sean independientes."""
