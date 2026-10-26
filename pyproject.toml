@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pichabuild"
+version = "0.1.0"
+description = "Prepara muestras de acordeon para SoundFont: afina, renombra, y no toca bucles"
+requires-python = ">=3.10"
+dependencies = ["numpy", "librosa"]
+
+[project.scripts]
+pichabuild = "pichabuild.__main__:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

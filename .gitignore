@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.wav
+*.sf2
+*.sf3
+*.sfz
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+respuestas.json
