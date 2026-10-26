@@ -1,9 +1,9 @@
-# pichabuild
+# pichabuilder 1.0
 
-Una caja que se apila, un escalón por vez. Todo lo que costó aprender, junto
-y en un solo sitio.
+**`pichabuild` v1.0.0** — una caja que se apila, un escalón por vez. Todo lo
+que costó aprender, junto y en un solo sitio.
 
-**Tres cosas: afinar · nombrar · construir.**
+**Tres cosas: afinar · nombrar · armar.**
 
 ## Las tres piezas
 

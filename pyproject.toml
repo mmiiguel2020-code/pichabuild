@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pichabuild"
-version = "0.1.0"
-description = "Prepara muestras de acordeon para SoundFont: afina, renombra, y no toca bucles"
+version = "1.0.0"
+description = "pichabuilder 1.0 — afina, nombra y arma SoundFonts de 5 registros para acordeon"
 requires-python = ">=3.10"
 dependencies = ["numpy", "librosa"]
 
