@@ -28,8 +28,18 @@ fi
 
 # dejar la URL en el Escritorio, con un archivo que se pueda abrir
 printf '%s\n' "$URL" > "$HOME/Escritorio/ABRIR-DIRECTOR.txt"
-printf '[Desktop Entry]\nType=Link\nName=Abrir el director\nURL=%s\nIcon=web-browser\n' \
-    "$URL" > "$HOME/Escritorio/abrir-director.desktop"
+# Type=Link ya no se puede lanzar en GNOME 50: va como Application, con la
+# URL entre comillas (el "?" es caracter reservado en Exec).
+cat > "$HOME/Escritorio/abrir-director.desktop" <<EOD
+[Desktop Entry]
+Type=Application
+Name=Abrir el director
+Comment=Abre la ventana del director ya autenticada
+Exec=xdg-open "$URL"
+Icon=web-browser
+Terminal=false
+Categories=Development;
+EOD
 chmod +x "$HOME/Escritorio/abrir-director.desktop"
 gio set "$HOME/Escritorio/abrir-director.desktop" metadata::trusted true 2>/dev/null
 
