@@ -1,13 +1,24 @@
-# PICHADIRECTOR — perfil minimo.
+# PICHADIRECTOR — perfil minimo para Groq (nivel gratuito, 8.000 tokens/min).
 #
-# Las herramientas NO estan en el arbol general: estan dentro del preset del
-# agente (preset-standard). Apagar plugins por fuera no servia de nada, porque
-# el preset volvia a montarlos. Aqui se reescribe el preset entero.
+# LAS HERRAMIENTAS VIENEN DE DOS SITIOS y hay que apagar en los dos:
 #
-# Groq da 8.000 tokens por minuto. Cada herramienta cuesta 600-900 tokens de
-# manual en CADA peticion. Con 30 herramientas el manual eran 7.150 tokens y
-# no cabia ni un "hola". Con bash solo, el manual son ~600.
+#   1. plugins del ARBOL      -> se apagan aqui abajo (id: tool-*)
+#   2. plugins del PRESET     -> se reescribe preset-standard entero
+#      (en el perfil web las herramientas del preset se MONTAN aparte, y
+#       apagarlas por fuera no sirve: el preset las vuelve a montar)
+#
+# Medido con el espia (~/pichadirector/tools/groq-spy.mjs, modo stub):
+#   sin tocar nada .......... 25 herramientas / 20.729 chars
+#   solo tocar el preset .... 25 herramientas (no bajaba)
+#   solo apagar el arbol ..... 2 herramientas /  2.847 chars
+#   los dos .................. 2 herramientas esperadas (bash + nada mas)
+#
+# El REA se apaga AQUI porque ~/.dsh/cordis.patch.yml lo INSERTA para todos
+# los perfiles y se aplica DESPUES de este archivo.
 
+# --------------------------------------------------------------------------
+# 1) EL PRESET: solo persona, instrucciones, hora y bash
+# --------------------------------------------------------------------------
 - id: preset-standard
   name: "@deepseek-ai/dsh-agent-preset"
   config:
@@ -31,11 +42,75 @@
         name: "@deepseek-ai/dsh-tool-bash"
         disabled: false
 
-# ---------------------------------------------------------------------------
-# El REA (ingenieria inversa) mete ~200 herramientas y Groq rechaza mas de
-# 128. Se apaga. OJO: ~/.dsh/cordis.patch.yml lo INSERTA para todos los
-# perfiles y va DESPUES de este archivo, por eso hay que apagarlo aqui.
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# 2) EL ARBOL: apagar todo lo que no sea bash
+# --------------------------------------------------------------------------
+- id: tool-fs
+  disabled: true
+- id: tool-fs-search
+  disabled: true
+- id: tool-jobs
+  disabled: true
+- id: tool-working-directory
+  disabled: true
+- id: tool-todo
+  disabled: true
+- id: tool-goal
+  disabled: true
+- id: tool-web
+  disabled: true
+- id: web
+  disabled: true
+- id: web-search-deepseek
+  disabled: true
+- id: web-deepseek-api
+  disabled: true
+- id: web-fetch-http
+  disabled: true
+- id: tool-workflow
+  disabled: true
+- id: workflow-ptc
+  disabled: true
+- id: subagent
+  disabled: true
+- id: subagent-spawn-in-process
+  disabled: true
+- id: subagent-fork-in-process
+  disabled: true
+- id: tool-subagent
+  disabled: true
+- id: tool-subagent-fork
+  disabled: true
+- id: tool-subagent-control
+  disabled: true
+- id: tool-subagent-list-agents
+  disabled: true
+- id: tool-skill
+  disabled: true
+- id: skill
+  disabled: true
+- id: skill-filesystem
+  disabled: true
+- id: tool-plugin-manager
+  disabled: true
+- id: tool-pwsh
+  disabled: true
+- id: mcp-resources
+  disabled: true
+- id: tool-present
+  disabled: true
+- id: present
+  disabled: true
+- id: schedule
+  disabled: true
+- id: user-questions
+  disabled: true
+- id: plan-mode
+  disabled: true
+
+# --------------------------------------------------------------------------
+# 3) REA (ingenieria inversa): ~200 herramientas, Groq corta en 128
+# --------------------------------------------------------------------------
 - id: rea-mcp
   name: "@deepseek-ai/dsh-mcp-client"
   disabled: true

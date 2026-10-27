@@ -6,7 +6,7 @@
   name: "@deepseek-ai/dsh-agent-default-model"
   config:
     provider: groq
-    model: qwen/qwen3.8-27b
+    model: openai/gpt-oss-120b
     reasoningEffort: low
 
 # ruta de Groq (compatible con OpenAI)
@@ -17,6 +17,13 @@
       groq:
         apiKeyEnv: GROQ_API_KEY
         baseURL: https://api.groq.com/openai/v1
+        # gpt-oss-120b declara 65.536 de salida maxima y DSH lo manda entero.
+        # Groq RESERVA ese hueco dentro del cupo de 8.000 tokens/minuto, asi que
+        # la peticion salia como "Requested 66.223" y fallaba con 413.
+        # Con 1.500 sobra para escribir un prompt.
+        modelOverrides:
+          openai/gpt-oss-120b:
+            maxOutputTokens: 1500
 
 # OJO: el REA se apaga con el overlay ~/pichadirector/sin-rea.yml, no aqui.
 # ~/.dsh/cordis.patch.yml inserta rea-mcp DESPUES de este archivo, asi que
