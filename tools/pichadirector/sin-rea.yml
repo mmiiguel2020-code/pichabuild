@@ -1,0 +1,41 @@
+# PICHADIRECTOR — perfil minimo.
+#
+# Las herramientas NO estan en el arbol general: estan dentro del preset del
+# agente (preset-standard). Apagar plugins por fuera no servia de nada, porque
+# el preset volvia a montarlos. Aqui se reescribe el preset entero.
+#
+# Groq da 8.000 tokens por minuto. Cada herramienta cuesta 600-900 tokens de
+# manual en CADA peticion. Con 30 herramientas el manual eran 7.150 tokens y
+# no cabia ni un "hola". Con bash solo, el manual son ~600.
+
+- id: preset-standard
+  name: "@deepseek-ai/dsh-agent-preset"
+  config:
+    id: standard
+    order: 1
+    plugins:
+      - id: persona
+        name: "@deepseek-ai/dsh-persona"
+        config:
+          prefix: >-
+            Eres pichadirector. NO programas y NO ejecutas cambios: escribes
+            el prompt que otro agente (el ejecutor) va a correr. Respondes en
+            espanol, corto y concreto. Tienes una sola herramienta, bash.
+      - id: agent-instructions
+        name: "@deepseek-ai/dsh-agent-instructions"
+        config:
+          maxBytes: 65536
+      - id: time-context
+        name: "@deepseek-ai/dsh-time-context"
+      - id: tool-bash
+        name: "@deepseek-ai/dsh-tool-bash"
+        disabled: false
+
+# ---------------------------------------------------------------------------
+# El REA (ingenieria inversa) mete ~200 herramientas y Groq rechaza mas de
+# 128. Se apaga. OJO: ~/.dsh/cordis.patch.yml lo INSERTA para todos los
+# perfiles y va DESPUES de este archivo, por eso hay que apagarlo aqui.
+# ---------------------------------------------------------------------------
+- id: rea-mcp
+  name: "@deepseek-ai/dsh-mcp-client"
+  disabled: true
